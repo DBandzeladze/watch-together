@@ -1,0 +1,51 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RoomRole {
+  HOST
+  MEMBER
+}
+
+model User {
+  id        String       @id @default(uuid())
+  email     String       @unique
+  username  String
+  password  String
+  createdAt DateTime     @default(now())
+
+  rooms     Room[]       @relation("RoomHost")
+  memberships RoomMember[]
+}
+
+model Room {
+  id         String       @id @default(uuid())
+  name       String
+  inviteCode String       @unique
+  videoUrl   String
+  createdAt  DateTime     @default(now())
+
+  hostId     String
+  host       User         @relation("RoomHost", fields: [hostId], references: [id])
+
+  members    RoomMember[]
+}
+
+model RoomMember {
+  id       String   @id @default(uuid())
+  userId   String
+  roomId   String
+  role     RoomRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  room     Room     @relation(fields: [roomId], references: [id])
+
+  @@unique([userId, roomId])
+}
