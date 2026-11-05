@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+/* app/globals.css */
+html,
+body {
+  /* Replace with your specific color variable or hex code */
+  background-color: #09090b;
+  color: #ffffff;
+
+  /* Optional: Ensures the page occupies the full viewport height */
+  min-height: 100vh;
+}
