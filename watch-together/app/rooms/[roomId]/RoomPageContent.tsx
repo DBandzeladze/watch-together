@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { useAuth } from "@/src/context/AuthContext";
-import { getUserRooms } from "@/src/services/room.service";
+import { getUserRooms, joinRoom } from "@/src/services/room.service";
 import type { UserRoom } from "@/src/types/room";
 import { useRoomSocket } from "@/src/hooks/useRoomSocket";
 import { PlaybackState } from "@/src/types/socket";
+import { useSearchParams } from "next/navigation";
 
 interface RoomPageContentProps {
   params: Promise<{ roomId: string }>;
@@ -17,13 +18,17 @@ interface RoomPageContentProps {
 export default function RoomPageContent({ params }: RoomPageContentProps) {
   const { roomId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteCode = searchParams.get("inviteCode");
   const { user, isLoading } = useAuth();
-  const { socket, isConnected, roomError, playbackState, participants } =
-    useRoomSocket(roomId);
 
   const [room, setRoom] = useState<UserRoom | null>(null);
+
+  const { socket, isConnected, roomError, playbackState, participants } =
+    useRoomSocket(roomId, !!room);
   const [isLoadingRoom, setIsLoadingRoom] = useState(true);
   const [error, setError] = useState("");
+  const [copiedItem, setCopiedItem] = useState<"code" | "link" | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -126,6 +131,19 @@ export default function RoomPageContent({ params }: RoomPageContentProps) {
     }
   };
 
+  const handleCopy = async (value: string, item: "code" | "link") => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedItem(item);
+
+      setTimeout(() => {
+        setCopiedItem(null);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to copy:", error);
+    }
+  };
+
   useEffect(() => {
     if (!playbackState) return;
 
@@ -136,7 +154,8 @@ export default function RoomPageContent({ params }: RoomPageContentProps) {
     if (isLoading) return;
 
     if (!user) {
-      router.replace("/login");
+      const returnUrl = `/rooms/${roomId}${inviteCode ? `?inviteCode=${encodeURIComponent(inviteCode)}` : ""}`;
+      router.replace(`/login?redirect=${encodeURIComponent(returnUrl)}`);
       return;
     }
 
@@ -147,16 +166,33 @@ export default function RoomPageContent({ params }: RoomPageContentProps) {
         const rooms = await getUserRooms();
         const foundRoom = rooms.find((item) => item.id === roomId);
 
+        if (foundRoom) {
+          if (isMounted) setRoom(foundRoom);
+          return;
+        }
+
+        if (!inviteCode) {
+          throw new Error(
+            "You are not a member of this room and no invite code was provided.",
+          );
+        }
+
+        const joinedRoom = await joinRoom({ inviteCode });
+
         if (isMounted) {
-          if (foundRoom) {
-            setRoom(foundRoom);
-          } else {
-            setError("Room not found or you are not a member of this room.");
-          }
+          setRoom({
+            ...joinedRoom,
+            createdAt: "",
+            hostId: "",
+            joinedAt: "",
+            role: joinedRoom.role,
+          });
         }
       } catch (err) {
         if (isMounted) {
-          setError(err instanceof Error ? err.message : "Could not load room");
+          setError(
+            err instanceof Error ? err.message : "Could not load or join room",
+          );
         }
       } finally {
         if (isMounted) setIsLoadingRoom(false);
@@ -168,7 +204,7 @@ export default function RoomPageContent({ params }: RoomPageContentProps) {
     return () => {
       isMounted = false;
     };
-  }, [user, isLoading, roomId, router]);
+  }, [user, isLoading, roomId, inviteCode, router]);
 
   if (isLoading || isLoadingRoom) {
     return (
@@ -210,9 +246,24 @@ export default function RoomPageContent({ params }: RoomPageContentProps) {
           {roomError && <p className="text-sm text-red-400">{roomError}</p>}
           <div>
             <h1 className="text-2xl font-semibold">{room.name}</h1>
-            <p className="text-sm text-zinc-400">
-              Invite code: {room.inviteCode}
-            </p>
+
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-sm text-zinc-400">
+                Invite code: {room.inviteCode}
+              </span>
+
+              <button
+                onClick={() =>
+                  handleCopy(
+                    `${window.location.origin}/rooms/${room.id}?inviteCode=${encodeURIComponent(room.inviteCode)}`,
+                    "link",
+                  )
+                }
+                className="rounded-md border border-zinc-700 px-3 py-1 text-xs hover:bg-zinc-800"
+              >
+                {copiedItem === "link" ? "Copied!" : "Copy invitation link"}
+              </button>
+            </div>
           </div>
 
           <Link href="/" className="underline">

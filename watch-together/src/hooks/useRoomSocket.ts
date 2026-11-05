@@ -23,7 +23,10 @@ interface UseRoomSocketReturn {
   participants: RoomParticipant[];
 }
 
-export function useRoomSocket(roomId: string): UseRoomSocketReturn {
+export function useRoomSocket(
+  roomId: string,
+  enabled: boolean,
+): UseRoomSocketReturn {
   const [socket, setSocket] = useState<AppSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [roomError, setRoomError] = useState<string | null>(null);
@@ -83,7 +86,7 @@ export function useRoomSocket(roomId: string): UseRoomSocketReturn {
       setSocket(null);
       setIsConnected(false);
     };
-  }, [roomId]);
+  }, [roomId, enabled]);
 
   return {
     socket,

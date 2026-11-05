@@ -2,11 +2,13 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/src/context/AuthContext";
 
 export default function LoginForm() {
   const { signIn } = useAuth();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect");
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -21,7 +23,15 @@ export default function LoginForm() {
 
     try {
       await signIn({ email, password });
-      router.push("/");
+
+      const redirect = searchParams.get("redirect");
+
+      const destination =
+        redirect?.startsWith("/") && !redirect.startsWith("//")
+          ? redirect
+          : "/";
+
+      router.push(destination);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -75,7 +85,14 @@ export default function LoginForm() {
 
       <p className="text-sm text-zinc-400">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="text-white underline">
+        <Link
+          href={
+            redirect
+              ? `/register?redirect=${encodeURIComponent(redirect)}`
+              : "/register"
+          }
+          className="text-white underline"
+        >
           Register
         </Link>
       </p>

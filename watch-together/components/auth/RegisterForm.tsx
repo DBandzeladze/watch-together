@@ -3,9 +3,10 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useAuth } from "@/src/context/AuthContext";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function RegisterForm() {
-  const { signUp } = useAuth();
+  const { signUp, signIn } = useAuth();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -13,6 +14,9 @@ export default function RegisterForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect");
+  const router = useRouter();
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -22,10 +26,15 @@ export default function RegisterForm() {
 
     try {
       await signUp({ username, email, password });
-      setSuccess("Account created successfully. You can now log in.");
-      setUsername("");
-      setEmail("");
-      setPassword("");
+
+      await signIn({ email, password });
+
+      const destination =
+        redirect?.startsWith("/") && !redirect.startsWith("//")
+          ? redirect
+          : "/";
+
+      router.push(destination);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -95,7 +104,14 @@ export default function RegisterForm() {
 
       <p className="text-sm text-zinc-400">
         Already have an account?{" "}
-        <Link href="/login" className="text-white underline">
+        <Link
+          href={
+            redirect
+              ? `/login?redirect=${encodeURIComponent(redirect)}`
+              : "/login"
+          }
+          className="text-white underline"
+        >
           Log in
         </Link>
       </p>
